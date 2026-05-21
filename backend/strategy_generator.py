@@ -3,7 +3,7 @@ import json
 import requests
 import yfinance as yf
 # --- UPDATED: Modern client components import ---
-from google import genai
+import google.generativeai as genai
 from google.genai import types
 from dotenv import load_dotenv
 from strategies import get_indicators, calculate_metrics, run_strategy

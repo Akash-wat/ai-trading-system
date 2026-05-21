@@ -2,7 +2,7 @@ import os
 import json
 from datetime import datetime
 # --- UPDATED: Modern client import statements ---
-from google import genai
+import google.generativeai as genai
 from google.genai import types
 from dotenv import load_dotenv
 import sys

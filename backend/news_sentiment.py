@@ -3,7 +3,7 @@ import requests
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 # --- UPDATED: Use the modern SDK package ---
-from google import genai
+import google.generativeai as genai
 from google.genai import types
 
 load_dotenv()
