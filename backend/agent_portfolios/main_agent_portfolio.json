@@ -1,0 +1,73 @@
+{
+  "agent_name": "main_agent",
+  "cash": 1608.6,
+  "initial_capital": 10000,
+  "positions": {
+    "RELIANCE": {
+      "symbol": "RELIANCE",
+      "buy_price": 1350,
+      "quantity": 5,
+      "total_cost": 6750,
+      "target": 1420,
+      "stop_loss": 1290,
+      "entry_time": "2026-05-21T15:44:08.353662",
+      "reason": "Test buy",
+      "current_price": 1350
+    },
+    "COALINDIA": {
+      "symbol": "COALINDIA",
+      "buy_price": 460.2,
+      "quantity": 1,
+      "total_cost": 460.2,
+      "target": 477.01,
+      "stop_loss": 443.39,
+      "entry_time": "2026-05-21T15:49:39.584232",
+      "reason": "Signal score: 70, Strategy: Multi-Factor",
+      "current_price": 460.2
+    },
+    "INFY": {
+      "symbol": "INFY",
+      "buy_price": 1181.2,
+      "quantity": 1,
+      "total_cost": 1181.2,
+      "target": 1221.33,
+      "stop_loss": 1141.07,
+      "entry_time": "2026-05-21T15:49:40.076771",
+      "reason": "Signal score: 66, Strategy: Mean Reversion in Uptrend",
+      "current_price": 1181.2
+    }
+  },
+  "trades": [
+    {
+      "type": "BUY",
+      "symbol": "RELIANCE",
+      "price": 1350,
+      "quantity": 5,
+      "total": 6750,
+      "time": "2026-05-21T15:44:08.353681",
+      "reason": "Test buy"
+    },
+    {
+      "type": "BUY",
+      "symbol": "COALINDIA",
+      "price": 460.2,
+      "quantity": 1,
+      "total": 460.2,
+      "time": "2026-05-21T15:49:39.584253",
+      "reason": "Signal score: 70, Strategy: Multi-Factor"
+    },
+    {
+      "type": "BUY",
+      "symbol": "INFY",
+      "price": 1181.2,
+      "quantity": 1,
+      "total": 1181.2,
+      "time": "2026-05-21T15:49:40.076788",
+      "reason": "Signal score: 66, Strategy: Mean Reversion in Uptrend"
+    }
+  ],
+  "total_pnl": 0.0,
+  "week_pnl": 0.0,
+  "week_start": "2026-05-21",
+  "created_at": "2026-05-21T15:44:08.350767"
+}
