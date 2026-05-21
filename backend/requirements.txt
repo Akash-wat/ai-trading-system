@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+yfinance
+pandas
+numpy
+requests
+beautifulsoup4
+groq
+google-generativeai
+supabase
+redis
+python-dotenv
+apscheduler
+psutil
+vectorbt
