@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
+import os
 from api.routes import router
 from market_context.market_context import get_market_context
 
@@ -32,5 +33,8 @@ def root():
 def health():
     return {"status": "healthy"}
 
+# This is the critical part for Render
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8000))
+    # Bind to 0.0.0.0 to accept external requests
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
