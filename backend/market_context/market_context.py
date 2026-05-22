@@ -1,5 +1,6 @@
 import yfinance as yf
 from datetime import datetime
+from database import supabase
 
 
 def get_market_context():
@@ -61,6 +62,19 @@ def get_market_context():
     except Exception as e:
         return {"error": str(e)}
 
+def save_market_data(context):
+    try:
+        supabase.table("market_data").insert({
+            "nifty_price": context.get("nifty", {}).get("price"),
+            "nifty_change": context.get("nifty", {}).get("change_pct"),
+            "banknifty_price": context.get("banknifty", {}).get("price"),
+            "banknifty_change": context.get("banknifty", {}).get("change_pct"),
+            "india_vix": context.get("india_vix"),
+            "volatility": context.get("volatility"),
+            "market_mood": context.get("market_mood")
+        }).execute()
+    except Exception as e:
+        print(f"Save market data error: {e}")
 
 if __name__ == "__main__":
     context = get_market_context()

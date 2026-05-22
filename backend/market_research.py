@@ -1,8 +1,6 @@
 import os
 import json
-# --- UPDATED: Modern client import ---
 import google.generativeai as genai
-from google.genai import types
 from dotenv import load_dotenv
 from fundamentals.fundamentals import get_fundamentals
 from market_context.market_context import get_market_context
@@ -10,8 +8,9 @@ from market_regime import detect_market_regime
 
 load_dotenv()
 
-# --- UPDATED: Modern initialization format ---
-client = genai.Client()
+# Configure Gemini (old SDK)
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-pro')
 
 
 def research_stock(symbol):
@@ -47,22 +46,13 @@ Provide institutional-grade research in JSON:
     "institutional_view": "what smart money likely thinks"
 }}"""
 
-        # --- UPDATED: Execute modern model generation call ---
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.2
-            )
-        )
+        response = model.generate_content(prompt)
         text = response.text.strip()
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             text = text.split("```")[1].split("```")[0].strip()
 
-        import json
         research = json.loads(text)
         research["symbol"] = clean
         research["fundamentals"] = fundamentals
@@ -94,22 +84,13 @@ Respond in JSON:
     "rotation_signal": "is money flowing in or out"
 }}"""
 
-        # --- UPDATED: Modern client mapping framework ---
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.2
-            )
-        )
+        response = model.generate_content(prompt)
         text = response.text.strip()
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             text = text.split("```")[1].split("```")[0].strip()
 
-        import json
         return json.loads(text)
 
     except Exception as e:
@@ -149,22 +130,13 @@ Respond in JSON:
     "trading_plan": "what to do today in 3 sentences"
 }}"""
 
-        # --- UPDATED: Using proper generation parameters ---
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.3
-            )
-        )
+        response = model.generate_content(prompt)
         text = response.text.strip()
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             text = text.split("```")[1].split("```")[0].strip()
 
-        import json
         return json.loads(text)
 
     except Exception as e:

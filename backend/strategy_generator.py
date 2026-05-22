@@ -2,9 +2,7 @@ import os
 import json
 import requests
 import yfinance as yf
-# --- UPDATED: Modern client components import ---
 import google.generativeai as genai
-from google.genai import types
 from dotenv import load_dotenv
 from strategies import get_indicators, calculate_metrics, run_strategy
 from database import supabase
@@ -12,8 +10,9 @@ import pandas as pd
 
 load_dotenv()
 
-# --- UPDATED: Establish standard client object initialization ---
-client = genai.Client()
+# Configure Gemini (old SDK)
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-pro')
 
 
 def generate_new_strategies():
@@ -54,23 +53,16 @@ Respond strictly in a valid raw JSON array format matching this structural signa
 ]"""
 
         try:
-            # Plan A: Attempt using the primary Gemini Client
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    response_mime_type="application/json",
-                    temperature=0.5
-                )
-            )
+            # Plan A: Attempt using Gemini (old SDK)
+            response = model.generate_content(prompt)
             text = response.text.strip()
         except Exception as gemini_err:
-            # Plan B: Free fallback to Groq Cloud API if Gemini hits high demand limits
-            print(f"⚠️ Gemini experiencing high demand (503). Routing request to Groq pipeline...")
+            # Plan B: Free fallback to Groq Cloud API
+            print(f"⚠️ Gemini error. Routing request to Groq pipeline...")
             
             groq_api_key = os.getenv("GROQ_API_KEY")
             if not groq_api_key:
-                raise Exception("Both Gemini (503) and Groq (Missing API Key) are unavailable.")
+                raise Exception("Both Gemini and Groq are unavailable.")
                 
             headers = {
                 "Authorization": f"Bearer {groq_api_key}",
@@ -109,6 +101,7 @@ Respond strictly in a valid raw JSON array format matching this structural signa
 
     except Exception as e:
         return {"error": str(e)}
+
 
 def backtest_ai_strategy(strategy_config, symbol="RELIANCE.NS"):
     """Backtest an AI generated strategy with smarter condition parsing"""
@@ -252,6 +245,7 @@ def backtest_ai_strategy(strategy_config, symbol="RELIANCE.NS"):
     except Exception as e:
         print(f"  Backtest error: {e}")
         return None
+
 
 def run_strategy_generation_cycle():
     """Full cycle: generate → backtest → save winners"""

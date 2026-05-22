@@ -142,6 +142,15 @@ class ManipulationDetector:
         self.alerted_stocks.clear()
 
 
+_detector = None
+
+def get_manipulation_detector():
+    global _detector
+    if _detector is None:
+        _detector = ManipulationDetector()
+    return _detector
+
+
 if __name__ == "__main__":
     print("🧪 Testing Manipulation Detector")
     detector = ManipulationDetector()

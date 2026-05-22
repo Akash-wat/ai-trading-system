@@ -2,14 +2,13 @@ import os
 import requests
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-# --- UPDATED: Use the modern SDK package ---
 import google.generativeai as genai
-from google.genai import types
 
 load_dotenv()
 
-# --- UPDATED: Modern client initialization ---
-client = genai.Client()
+# Configure Gemini
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-pro')
 
 
 def fetch_news(symbol, company_name=None):
@@ -57,20 +56,14 @@ def fetch_news(symbol, company_name=None):
 def get_ai_news_context(symbol):
     """Use Gemini to provide market context when no news API available"""
     try:
-        # --- UPDATED: Use proper modern client generation call ---
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=f"""What is the recent market sentiment and key factors for {symbol} stock in Indian markets?
-            Provide 3-4 key points about:
-            1. Recent business developments
-            2. Sector trends affecting this stock
-            3. Any known concerns or positives
-            Keep each point to one sentence. Format as JSON list with keys: title, description""",
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.2
-            )
-        )
+        prompt = f"""What is the recent market sentiment and key factors for {symbol} stock in Indian markets?
+        Provide 3-4 key points about:
+        1. Recent business developments
+        2. Sector trends affecting this stock
+        3. Any known concerns or positives
+        Keep each point to one sentence. Format as JSON list with keys: title, description"""
+        
+        response = model.generate_content(prompt)
         import json
         text = response.text.strip()
         if "```json" in text:
@@ -116,15 +109,7 @@ Respond in JSON format:
     "trading_implication": "one sentence on what this means for trading"
 }}"""
 
-        # --- UPDATED: Modern structural client parameters ---
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.1
-            )
-        )
+        response = model.generate_content(prompt)
         text = response.text.strip()
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()

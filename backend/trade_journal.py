@@ -1,9 +1,7 @@
 import os
 import json
 from datetime import datetime
-# --- UPDATED: Modern client import statements ---
 import google.generativeai as genai
-from google.genai import types
 from dotenv import load_dotenv
 import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -11,8 +9,9 @@ from database import supabase
 
 load_dotenv()
 
-# --- UPDATED: Instantiating client tool --
-client = genai.Client()
+# Configure Gemini (old SDK)
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-pro')
 
 
 def create_trade_journal_entry(trade_data):
@@ -44,22 +43,13 @@ Write a trading journal entry in JSON:
     "next_time": "what to do differently next time"
 }}"""
 
-        # --- UPDATED: Execution mapping via current SDK model structures ---
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.3
-            )
-        )
+        response = model.generate_content(prompt)
         text = response.text.strip()
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             text = text.split("```")[1].split("```")[0].strip()
 
-        import json
         journal = json.loads(text)
         journal["symbol"] = trade_data.get("symbol")
         journal["timestamp"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -98,7 +88,7 @@ def get_performance_analysis():
             return {"message": "No closed trades to analyze yet"}
 
         wins = [t for t in closed if (t.get("pnl") or 0) > 0]
-        identity_losses = [t for t in closed if (t.get("pnl") or 0) <= 0]
+        losses = [t for t in closed if (t.get("pnl") or 0) <= 0]
         total_pnl = sum(t.get("pnl") or 0 for t in closed)
         win_rate = len(wins) / len(closed) * 100 if closed else 0
 
@@ -109,7 +99,7 @@ Performance Stats:
 - Win Rate: {round(win_rate, 1)}%
 - Total P&L: ₹{round(total_pnl, 2)}
 - Winning Trades: {len(wins)}
-- Losing Trades: {len(identity_losses)}
+- Losing Trades: {len(losses)}
 - Best Trade: ₹{max([t.get('pnl') or 0 for t in closed])}
 - Worst Trade: ₹{min([t.get('pnl') or 0 for t in closed])}
 
@@ -127,29 +117,20 @@ Provide performance analysis in JSON:
     "projected_improvement": "what improvement is possible with adjustments"
 }}"""
 
-        # --- UPDATED: Modern execution pipeline syntax ---
-        response = client.models.generate_content(
-            model="gemini-2.5-flash",
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                response_mime_type="application/json",
-                temperature=0.3
-            )
-        )
+        response = model.generate_content(prompt)
         text = response.text.strip()
         if "```json" in text:
             text = text.split("```json")[1].split("```")[0].strip()
         elif "```" in text:
             text = text.split("```")[1].split("```")[0].strip()
 
-        import json
         analysis = json.loads(text)
         analysis["stats"] = {
             "total_trades": len(closed),
             "win_rate": round(win_rate, 1),
             "total_pnl": round(total_pnl, 2),
             "wins": len(wins),
-            "losses": len(identity_losses)
+            "losses": len(losses)
         }
         return analysis
 

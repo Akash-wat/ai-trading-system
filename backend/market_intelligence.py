@@ -11,6 +11,7 @@ from typing import List, Dict, Any, Optional
 
 import yfinance as yf
 import requests
+import google.generativeai as genai
 
 # Import existing modules
 import sys
@@ -20,6 +21,13 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from inter_agent_comm import AgentCommunicator, MessageType, Priority
 from news_sentiment import get_full_sentiment
 from market_context.market_context import get_market_context
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Configure Gemini (old SDK)
+genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+model = genai.GenerativeModel('gemini-pro')
 
 
 class MarketIntelligence:
@@ -153,13 +161,6 @@ class MarketIntelligence:
     def get_ai_market_summary(self, global_data: Dict, pre_market: Dict) -> str:
         """Get AI-generated market summary using Gemini."""
         try:
-            import google.generativeai as genai
-            from dotenv import load_dotenv
-            load_dotenv()
-            
-            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-            model = genai.GenerativeModel("gemini-2.0-flash-exp")
-            
             prompt = f"""You are a market analyst. Analyze this pre-market data and provide a 2-3 sentence summary for Indian traders.
 
 Global Markets:
@@ -222,13 +223,6 @@ Keep it concise and actionable."""
             return {"has_important_news": False, "sentiment": "NEUTRAL", "impact": "LOW"}
         
         try:
-            import google.generativeai as genai
-            from dotenv import load_dotenv
-            load_dotenv()
-            
-            genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            
             news_text = "\n".join([f"- {n['title']}: {n['description']}" for n in news_items[:3]])
             
             prompt = f"""Analyze these news headlines for Indian market impact:

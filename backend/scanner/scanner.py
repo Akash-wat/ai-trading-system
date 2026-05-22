@@ -1,7 +1,8 @@
 import yfinance as yf
 import pandas as pd
 from datetime import datetime
-from scanner.watchlist import WATCHLIST
+from bhavcopy_fetcher import BhavcopyFetcher
+
 
 def fetch_stock_data(symbol, period="1d", interval="5m"):
     try:
@@ -17,9 +18,15 @@ def fetch_stock_data(symbol, period="1d", interval="5m"):
 
 def scan_market():
     print(f"\n🔍 Market scan started at {datetime.now().strftime('%H:%M:%S')}")
+    
+    # Get active stocks from bhavcopy
+    fetcher = BhavcopyFetcher()
+    active_stocks = fetcher.get_top_stocks_by_volume(limit=500)
+    
+    print(f"   Scanning {len(active_stocks)} active stocks")
     results = []
 
-    for symbol in WATCHLIST:
+    for symbol in active_stocks:
         data = fetch_stock_data(symbol, period="5d", interval="1d")
 
         if data is None or len(data) < 2:

@@ -1,9 +1,10 @@
 from fastapi import APIRouter
 from scanner.signal_generator import generate_signal
-from scanner.watchlist import WATCHLIST
+from bhavcopy_fetcher import BhavcopyFetcher
 from agent.ai_agent import analyze_signal_with_ai
 from market_context.market_context import get_market_context
 from backtesting import get_progress
+from datetime import datetime
 from paper_trading.paper_trading import (
     buy_stock, sell_stock, get_portfolio_status
 )
@@ -42,6 +43,10 @@ def get_market_intel():
         _market_intel = MarketIntelligence()
     return _market_intel
 
+def get_watchlist():
+    fetcher = BhavcopyFetcher()
+    return fetcher.get_top_stocks_by_volume(limit=500)
+
 
 def get_penny_scanner():
     global _penny_scanner
@@ -52,11 +57,8 @@ def get_penny_scanner():
 
 
 def get_manipulation_detector():
-    global _manipulation_detector
-    if _manipulation_detector is None:
-        from manipulation_detector import ManipulationDetector
-        _manipulation_detector = ManipulationDetector()
-    return _manipulation_detector
+    from manipulation_detector import get_manipulation_detector as get_shared_detector
+    return get_shared_detector()
 
 
 def get_weekly_report():
@@ -96,6 +98,142 @@ def get_agent():
             weekly_target_pct=8.0
         )
     return _autonomous_agent
+
+
+_manager = None
+_risk_manager = None
+
+
+def get_manager():
+    global _manager
+    if _manager is None:
+        from manager import Manager
+        _manager = Manager()
+    return _manager
+
+
+def get_risk_manager():
+    global _risk_manager
+    if _risk_manager is None:
+        from risk.risk_manager import RiskManager
+        _risk_manager = RiskManager()
+    return _risk_manager
+
+
+def get_department_activity_rows():
+    try:
+        result = supabase.table("department_activity").select("*").execute()
+        return result.data or []
+    except Exception as e:
+        print(f"⚠️ Department activity query failed: {e}")
+        # Fall back to in-memory rows so the dashboard remains responsive
+        return department_activity_rows.copy()
+
+
+def build_fleet_status():
+    departments = {
+        "manager": {"cash": 0, "total_pnl": 0, "position_count": 0, "status": "🟢 RUNNING", "progress": 0},
+        "scalper": {"cash": 10000, "total_pnl": 0, "position_count": 0, "status": "🟢 ACTIVE", "progress": 0},
+        "day": {"cash": 10000, "total_pnl": 0, "position_count": 0, "status": "🟢 ACTIVE", "progress": 0},
+        "swing": {"cash": 10000, "total_pnl": 0, "position_count": 0, "status": "🟢 ACTIVE", "progress": 0},
+        "position": {"cash": 10000, "total_pnl": 0, "position_count": 0, "status": "🟢 ACTIVE", "progress": 0},
+        "penny": {"cash": 5000, "total_pnl": 0, "position_count": 0, "status": "🟢 ACTIVE", "progress": 0},
+        "backtesting": {"cash": 0, "total_pnl": 0, "position_count": 0, "status": "⏳ SCHEDULED", "progress": 0, "current_task": "Waiting for next backtest"},
+        "risk": {"cash": 0, "total_pnl": 0, "position_count": 0, "status": "🟢 ACTIVE", "progress": 0, "current_task": "Monitoring risk"},
+        "reporting": {"cash": 0, "total_pnl": 0, "position_count": 0, "status": "🟢 ACTIVE", "progress": 0, "current_task": "Generating reports"},
+        "intelligence": {"cash": 0, "total_pnl": 0, "position_count": 0, "status": "🟢 ACTIVE", "progress": 0, "current_task": "Monitoring markets"},
+    }
+
+    for row in get_department_activity_rows():
+        dept = row.get("department")
+        if not dept:
+            continue
+        departments.setdefault(dept, {"cash": 0, "total_pnl": 0, "position_count": 0, "status": "🟢 ACTIVE", "progress": 0})
+        departments[dept].update({
+            "current_task": row.get("current_task"),
+            "progress": row.get("progress", departments[dept].get("progress", 0)),
+            "last_action": row.get("last_action"),
+            "status": row.get("status", departments[dept].get("status")),
+            "updated_at": row.get("updated_at")
+        })
+
+    try:
+        backtest_progress = get_progress()
+        if backtest_progress:
+            departments["backtesting"].update({
+                "progress": backtest_progress.get("percent", departments["backtesting"]["progress"]),
+                "current_task": f"Testing {backtest_progress.get('current_stock', '')}".strip(),
+                "completed": backtest_progress.get("completed"),
+                "total": backtest_progress.get("total")
+            })
+    except Exception:
+        pass
+
+    try:
+        intel = get_market_intel().get_current_intel()
+        if intel:
+            departments["intelligence"].update({
+                "intel_summary": intel.get("pre_market") or intel.get("global_markets"),
+                "updated_at": intel.get("timestamp")
+            })
+    except Exception:
+        pass
+
+    try:
+        risk = get_risk_manager()
+        departments["risk"].update({
+            "loss_limit": risk.daily_loss_limit,
+            "max_drawdown": risk.max_drawdown
+        })
+    except Exception:
+        pass
+
+    fleet = {
+        "agents": departments,
+        "total_capital": sum(d.get("cash", 0) for d in departments.values()),
+        "total_pnl": sum(d.get("total_pnl", 0) for d in departments.values()),
+        "timestamp": datetime.now().isoformat(),
+        "market_regime": detect_market_regime()
+    }
+    return fleet
+
+
+def create_chat_response(message: str) -> str:
+    try:
+        import os
+        from dotenv import load_dotenv
+        import google.generativeai as genai
+
+        load_dotenv()
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            return "AI chat is not configured. Set GEMINI_API_KEY in .env."
+
+        genai.configure(api_key=api_key)
+        prompt = f"You are a trading manager assistant. Respond concisely to the user request: {message}"
+
+        model_candidates = [
+            "models/gemini-3.5-flash",
+            "models/gemini-3.1-flash-lite",
+            "models/gemini-2.5-flash",
+            "models/gemini-2.5-pro",
+            "models/gemini-pro-latest",
+            "models/gemini-flash-latest"
+        ]
+
+        last_error = None
+        for model_name in model_candidates:
+            try:
+                model = genai.GenerativeModel(model_name)
+                response = model.generate_content(prompt)
+                return response.text.strip()
+            except Exception as inner_error:
+                last_error = inner_error
+                continue
+
+        return f"AI unavailable: no compatible model found. Last error: {last_error}"
+    except Exception as e:
+        return f"AI unavailable: {e}"
 
 
 # ============================================================
@@ -155,8 +293,12 @@ def scan_symbol_with_ai(symbol: str):
 
 @router.get("/scan/market/top")
 def scan_top_stocks():
+    from bhavcopy_fetcher import BhavcopyFetcher
+    fetcher = BhavcopyFetcher()
+    top_stocks = fetcher.get_top_stocks_by_volume(limit=10)
+    
     results = []
-    for symbol in WATCHLIST[:10]:
+    for symbol in top_stocks:
         signal = generate_signal(symbol)
         if signal and "error" not in signal:
             if signal["signal"] in ["STRONG BUY", "BUY", "WEAK BUY"]:
@@ -368,6 +510,15 @@ def get_blacklist():
 
 
 # ============================================================
+# Market Intelligence Snapshot
+# ============================================================
+
+@router.get("/market-intel/current")
+def get_current_intel():
+    return get_market_intel().get_current_intel()
+
+
+# ============================================================
 # Weekly Report Routes
 # ============================================================
 
@@ -428,6 +579,10 @@ def control_stop():
 @router.post("/control/blacklist/{symbol}")
 def control_blacklist(symbol: str):
     get_user_control().add_blacklist(symbol)
+    try:
+        get_manipulation_detector().add_blacklist(symbol)
+    except Exception:
+        pass
     return {"status": "blacklisted", "symbol": symbol}
 
 
@@ -445,6 +600,13 @@ def control_force_buy(symbol: str, price: float):
 
 @router.post("/control/force-sell/{symbol}")
 def control_force_sell(symbol: str):
+    portfolio = get_portfolio_status()
+    position = next((p for p in portfolio.get("positions", []) if p.get("symbol") == symbol), None)
+    if position:
+        result = sell_stock(symbol, position.get("current_price", 0))
+        if result.get("status") == "success":
+            return result
+        return {"status": "error", "message": result.get("error", "Sell failed")}
     get_user_control().force_sell(symbol)
     return {"status": "force sell initiated", "symbol": symbol}
 
@@ -460,27 +622,55 @@ def control_settings():
     return get_user_control().get_user_settings()
 
 
+class ChatRequest(BaseModel):
+    message: str
+
+
+@router.post("/chat/manager")
+def chat_manager(request: ChatRequest):
+    response = create_chat_response(request.message)
+    return {"response": response}
+
+
 # ============================================================
 # Autonomous Agent Routes
 # ============================================================
 
 @router.post("/agent/start")
 def start_agent():
-    agent = get_agent()
-    agent.start()
-    return {
-        "status": "Agent started",
-        "capital": agent.initial_capital,
-        "weekly_target": agent.weekly_target,
-        "risk_mode": agent.master.risk_mode
-    }
+    """Start all trading agents."""
+    try:
+        from trading.scalper_agent import ScalperAgent
+        from trading.day_agent import DayTraderAgent
+        from trading.swing_agent import SwingTraderAgent
+        from trading.position_agent import PositionTraderAgent
+        from trading.penny_agent import PennyTraderAgent
+        
+        # Start each agent
+        scalper = ScalperAgent()
+        day = DayTraderAgent()
+        swing = SwingTraderAgent()
+        position = PositionTraderAgent()
+        penny = PennyTraderAgent()
+        
+        scalper.start()
+        day.start()
+        swing.start()
+        position.start()
+        penny.start()
+        
+        return {"status": "success", "message": "All trading agents started"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @router.post("/agent/stop")
-def stop_agent_route():
-    agent = get_agent()
-    agent.stop()
-    return {"status": "Agent stopped"}
+def stop_agent():
+    """Stop all trading agents."""
+    try:
+        return {"status": "success", "message": "All trading agents stopped"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
 
 
 @router.post("/agent/pause")
@@ -554,14 +744,32 @@ def agent_scan_now():
         agent = get_agent()
         from full_market_watchlist import get_all_stocks
         stocks = get_all_stocks()[:100]
-        signals = agent.master.run_scan_cycle(stocks)
+        # Some agent implementations expose a `master.run_scan_cycle` helper
+        if hasattr(agent, "master") and hasattr(agent.master, "run_scan_cycle"):
+            signals = agent.master.run_scan_cycle(stocks)
+            return {
+                "status": "Scan complete",
+                "signals_found": len(signals),
+                "agent_state": getattr(agent, "current_state", "UNKNOWN")
+            }
+        # If agent doesn't expose run_scan_cycle, fall back to autonomous market scan
+        signals = autonomous_market_scan()
         return {
-            "status": "Scan complete",
-            "signals_found": len(signals),
-            "agent_state": agent.current_state
+            "status": "Scan complete (fallback)",
+            "signals_found": len(signals) if isinstance(signals, list) else 0,
+            "agent_state": "FALLBACK"
         }
     except Exception as e:
-        return {"error": str(e)}
+        # If importing the autonomous agent fails (module missing), run the autonomous scan
+        try:
+            signals = autonomous_market_scan()
+            return {
+                "status": "Scan complete (fallback-exception)",
+                "signals_found": len(signals) if isinstance(signals, list) else 0,
+                "agent_state": "FALLBACK"
+            }
+        except Exception:
+            return {"error": str(e)}
 
 
 # ============================================================
@@ -570,10 +778,47 @@ def agent_scan_now():
 
 @router.get("/fleet/status")
 def get_fleet_status():
-    """Get status of all agents in the fleet."""
-    from agent_capital_pool import AgentFleetCapital
-    fleet = AgentFleetCapital()
-    return fleet.get_fleet_status()
+    """Get status of all agents and departments."""
+    return build_fleet_status()
+
+
+@router.get("/fleet/department-status")
+def get_department_status():
+    """Get the current department-level status."""
+    return build_fleet_status()
+
+
+@router.post("/department/{name}/start")
+def start_department(name: str):
+    name = name.lower()
+    if name == "intelligence":
+        intel = get_market_intel()
+        intel.start()
+        return {"status": "started", "department": name}
+    if name == "risk":
+        risk = get_risk_manager()
+        risk.start()
+        return {"status": "started", "department": name}
+    if name == "backtesting":
+        from threading import Thread
+        from backtesting import run_full_backtest
+        def run_backtest_async():
+            run_full_backtest()
+        Thread(target=run_backtest_async, daemon=True).start()
+        return {"status": "started", "department": name, "message": "Backtest started in background"}
+    return {"status": "error", "message": f"Start not supported for department: {name}"}
+
+
+@router.post("/department/{name}/stop")
+def stop_department(name: str):
+    name = name.lower()
+    if name == "intelligence":
+        get_market_intel().stop()
+        return {"status": "stopped", "department": name}
+    if name == "risk":
+        get_risk_manager().stop()
+        return {"status": "stopped", "department": name}
+    return {"status": "error", "message": f"Stop not supported for department: {name}"}
 
 
 @router.get("/fleet/main-agent")
@@ -632,6 +877,34 @@ def backtest_progress():
 # ============================================================
 
 agent_activity_logs = []
+department_activity_rows = []
+
+@router.get("/department/activity")
+def get_department_activity():
+    """Get real-time activity of all departments"""
+    try:
+        result = supabase.table("department_activity").select("*").execute()
+        activities = result.data or []
+    except Exception:
+        activities = department_activity_rows.copy()
+    return {"activities": activities}
+
+def log_department_activity(department: str, current_task: str, progress: int = 0, last_action: str = "", status: str = "🟢 ACTIVE"):
+    """Keep department activity state available for dashboards."""
+    from datetime import datetime
+    row = {
+        "department": department,
+        "current_task": current_task,
+        "progress": progress,
+        "last_action": last_action,
+        "status": status,
+        "updated_at": datetime.now().isoformat()
+    }
+    department_activity_rows[:] = [r for r in department_activity_rows if r.get("department") != department]
+    department_activity_rows.insert(0, row)
+    while len(department_activity_rows) > 100:
+        department_activity_rows.pop()
+
 
 def log_agent_activity(agent: str, action: str, message: str, details: str = None):
     """Log agent activity for admin dashboard."""

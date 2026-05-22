@@ -3,6 +3,7 @@ import numpy as np
 from strategies import ALL_STRATEGIES, strategy_fundamental_momentum
 from strategy_generator import backtest_ai_strategy
 from fundamentals.fundamentals import get_fundamentals
+from bhavcopy_fetcher import BhavcopyFetcher
 import sys
 import os
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -14,6 +15,7 @@ def fetch_data(symbol, period="1y"):
         return data if not data.empty and len(data) > 50 else None
     except:
         return None
+
 
 # Progress tracking
 _backtest_progress = {"percent": 0, "current_stock": "", "completed": 0, "total": 0}
@@ -28,7 +30,7 @@ def update_progress(percent, current_stock="", completed=0, total=0):
     }
 
 def get_progress():
-    return _backtest_progress        
+    return _backtest_progress
 
 
 def backtest_stock(symbol, fundamental_score=0):
@@ -67,15 +69,23 @@ def backtest_stock(symbol, fundamental_score=0):
     return results
 
 
-def run_full_backtest(symbols=None, max_stocks=20):
-    from scanner.watchlist import TIER1
-    if symbols is None:
-        symbols = TIER1[:max_stocks]
+def get_top_stocks():
+    """Get top stocks using bhavcopy instead of watchlist"""
+    try:
+        fetcher = BhavcopyFetcher()
+        stocks = fetcher.get_top_stocks_by_volume(limit=500)
+        # Filter out index symbols
+        stocks = [s for s in stocks if "NIFTY" not in s and "BANKNIFTY" not in s]
+        return stocks
+    except:
+        # Fallback to basic NIFTY 50
+        return [f"{s}.NS" for s in ["RELIANCE", "TCS", "HDFCBANK", "INFY", "ICICIBANK",
+                                      "HINDUNILVR", "SBIN", "BHARTIARTL", "ITC", "KOTAKBANK"]]
 
-    for idx, symbol in enumerate(symbols):
-        percent = int((idx + 1) / len(symbols) * 100)
-        update_progress(percent, symbol, idx + 1, len(symbols))
-    # rest of the backtest code...
+
+def run_full_backtest(symbols=None, max_stocks=20):
+    if symbols is None:
+        symbols = get_top_stocks()[:max_stocks]
 
     print(f"\n🔍 Backtesting {len(symbols)} stocks — 1 year data — {len(ALL_STRATEGIES)} strategies each")
     print("=" * 70)
@@ -84,8 +94,11 @@ def run_full_backtest(symbols=None, max_stocks=20):
     stock_best_strategies = {}
     strategy_aggregate = {}
 
-    for symbol in symbols:
-        print(f"  → {symbol}")
+    for idx, symbol in enumerate(symbols):
+        percent = int((idx + 1) / len(symbols) * 100)
+        update_progress(percent, symbol, idx + 1, len(symbols))
+        
+        print(f"  → {symbol} ({idx+1}/{len(symbols)}) - {percent}%")
 
         # Get fundamentals first
         fund = get_fundamentals(symbol)

@@ -6,7 +6,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from database import save_trade
 
 
-PORTFOLIO_FILE = "paper_trading/portfolio.json"
+PORTFOLIO_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "portfolio.json")
 
 
 def load_portfolio():
@@ -27,6 +27,11 @@ def save_portfolio(portfolio):
 
 
 def buy_stock(symbol, price, quantity, target, stop_loss, ai_analysis=""):
+    from manipulation_detector import get_manipulation_detector
+
+    if get_manipulation_detector().is_blacklisted(symbol):
+        return {"error": f"Cannot buy {symbol}; it is blacklisted."}
+
     portfolio = load_portfolio()
     total_cost = price * quantity
 
